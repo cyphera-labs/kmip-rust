@@ -1,0 +1,16 @@
+[package]
+name = "cyphera-kmip"
+version = "0.1.0"
+edition = "2021"
+description = "KMIP client for Rust — connect to any KMIP-compliant key management server"
+license = "Apache-2.0"
+repository = "https://github.com/cyphera-labs/kmip-rust"
+keywords = ["kmip", "key-management", "kms", "mtls", "encryption"]
+categories = ["cryptography", "network-programming"]
+
+[dependencies]
+rustls = "0.23"
+webpki-roots = "0.26"
+rustls-pemfile = "2"
+
+[dev-dependencies]
