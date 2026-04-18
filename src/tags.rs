@@ -65,10 +65,12 @@ pub mod operation {
 
 /// KMIP object types.
 pub mod object_type {
-    pub const SYMMETRIC_KEY: u32 = 0x00000001;
-    pub const PUBLIC_KEY: u32 = 0x00000002;
-    pub const PRIVATE_KEY: u32 = 0x00000003;
-    pub const CERTIFICATE: u32 = 0x00000006;
+    pub const CERTIFICATE: u32 = 0x00000001;
+    pub const SYMMETRIC_KEY: u32 = 0x00000002;
+    pub const PUBLIC_KEY: u32 = 0x00000003;
+    pub const PRIVATE_KEY: u32 = 0x00000004;
+    pub const SPLIT_KEY: u32 = 0x00000005;
+    pub const TEMPLATE: u32 = 0x00000006;
     pub const SECRET_DATA: u32 = 0x00000007;
     pub const OPAQUE_DATA: u32 = 0x00000008;
 }
