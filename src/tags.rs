@@ -60,7 +60,7 @@ pub mod operation {
     pub const GET: u32 = 0x0000000A;
     pub const ACTIVATE: u32 = 0x00000012;
     pub const DESTROY: u32 = 0x00000014;
-    pub const CHECK: u32 = 0x0000001C;
+    pub const CHECK: u32 = 0x00000009;
 }
 
 /// KMIP object types.

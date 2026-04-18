@@ -70,8 +70,8 @@ fn operation_destroy_is_14() {
 }
 
 #[test]
-fn operation_check_is_1c() {
-    assert_eq!(operation::CHECK, 0x0000001C);
+fn operation_check_is_09() {
+    assert_eq!(operation::CHECK, 0x00000009);
 }
 
 // ── ResultStatus values ──────────────────────────────────────────────
