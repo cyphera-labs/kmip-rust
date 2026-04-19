@@ -161,9 +161,11 @@ pub mod algorithm {
     pub const DSA: u32 = 0x00000005;
     pub const ECDSA: u32 = 0x00000006;
     pub const HMAC_SHA1: u32 = 0x00000007;
-    pub const HMAC_SHA256: u32 = 0x00000008;
-    pub const HMAC_SHA384: u32 = 0x00000009;
-    pub const HMAC_SHA512: u32 = 0x0000000A;
+    pub const HMAC_SHA224: u32 = 0x00000008;
+    pub const HMAC_SHA256: u32 = 0x00000009;
+    pub const HMAC_SHA384: u32 = 0x0000000A;
+    pub const HMAC_SHA512: u32 = 0x0000000B;
+    pub const HMAC_MD5: u32 = 0x0000000C;
 }
 
 /// KMIP name types.
@@ -181,6 +183,8 @@ pub mod usage_mask {
     pub const WRAP_KEY: u32 = 0x00000010;
     pub const UNWRAP_KEY: u32 = 0x00000020;
     pub const EXPORT: u32 = 0x00000040;
-    pub const DERIVE_KEY: u32 = 0x00000100;
+    pub const MAC_GENERATE: u32 = 0x00000080;
+    pub const MAC_VERIFY: u32 = 0x00000100;
+    pub const DERIVE_KEY: u32 = 0x00000200;
     pub const KEY_AGREEMENT: u32 = 0x00000800;
 }

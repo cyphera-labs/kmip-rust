@@ -224,13 +224,28 @@ fn algorithm_rsa_is_4() {
 }
 
 #[test]
-fn algorithm_hmac_sha256_is_8() {
-    assert_eq!(algorithm::HMAC_SHA256, 0x00000008);
+fn algorithm_hmac_sha224_is_8() {
+    assert_eq!(algorithm::HMAC_SHA224, 0x00000008);
 }
 
 #[test]
-fn algorithm_hmac_sha512_is_a() {
-    assert_eq!(algorithm::HMAC_SHA512, 0x0000000A);
+fn algorithm_hmac_sha256_is_9() {
+    assert_eq!(algorithm::HMAC_SHA256, 0x00000009);
+}
+
+#[test]
+fn algorithm_hmac_sha384_is_a() {
+    assert_eq!(algorithm::HMAC_SHA384, 0x0000000A);
+}
+
+#[test]
+fn algorithm_hmac_sha512_is_b() {
+    assert_eq!(algorithm::HMAC_SHA512, 0x0000000B);
+}
+
+#[test]
+fn algorithm_hmac_md5_is_c() {
+    assert_eq!(algorithm::HMAC_MD5, 0x0000000C);
 }
 
 // ── KeyFormatType values ─────────────────────────────────────────────
@@ -300,8 +315,18 @@ fn usage_mask_export_is_0x40() {
 }
 
 #[test]
-fn usage_mask_derive_key_is_0x100() {
-    assert_eq!(usage_mask::DERIVE_KEY, 0x00000100);
+fn usage_mask_mac_generate_is_0x80() {
+    assert_eq!(usage_mask::MAC_GENERATE, 0x00000080);
+}
+
+#[test]
+fn usage_mask_mac_verify_is_0x100() {
+    assert_eq!(usage_mask::MAC_VERIFY, 0x00000100);
+}
+
+#[test]
+fn usage_mask_derive_key_is_0x200() {
+    assert_eq!(usage_mask::DERIVE_KEY, 0x00000200);
 }
 
 // ── Bitmask combinations ────────────────────────────────────────────
