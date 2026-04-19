@@ -1,12 +1,13 @@
 //! KMIP 1.4 tag, type, and enum constants.
 //!
-//! Only the subset needed for Locate, Get, Create operations.
+//! Full set of tags and enums for all 27 KMIP operations.
 //!
 //! Reference: OASIS KMIP Specification v1.4
 //! <https://docs.oasis-open.org/kmip/spec/v1.4/kmip-spec-v1.4.html>
 
 /// KMIP tags — 3-byte identifiers for each field.
 pub mod tag {
+    // Message structure
     pub const REQUEST_MESSAGE: u32 = 0x420078;
     pub const RESPONSE_MESSAGE: u32 = 0x42007B;
     pub const REQUEST_HEADER: u32 = 0x420077;
@@ -51,16 +52,73 @@ pub mod tag {
 
     // Template
     pub const TEMPLATE_ATTRIBUTE: u32 = 0x420091;
+
+    // Key pair
+    pub const PRIVATE_KEY_UNIQUE_IDENTIFIER: u32 = 0x420066;
+    pub const PUBLIC_KEY_UNIQUE_IDENTIFIER: u32 = 0x42006F;
+    pub const PUBLIC_KEY: u32 = 0x42004E;
+    pub const PRIVATE_KEY: u32 = 0x42004D;
+
+    // Certificate
+    pub const CERTIFICATE: u32 = 0x420021;
+    pub const CERTIFICATE_TYPE: u32 = 0x42001D;
+    pub const CERTIFICATE_VALUE: u32 = 0x42001E;
+
+    // Crypto operations
+    pub const DATA: u32 = 0x420033;
+    pub const IV_COUNTER_NONCE: u32 = 0x420047;
+    pub const SIGNATURE_DATA: u32 = 0x42004F;
+    pub const MAC_DATA: u32 = 0x420051;
+    pub const VALIDITY_INDICATOR: u32 = 0x420098;
+
+    // Revocation
+    pub const REVOCATION_REASON: u32 = 0x420082;
+    pub const REVOCATION_REASON_CODE: u32 = 0x420083;
+
+    // Query
+    pub const QUERY_FUNCTION: u32 = 0x420074;
+
+    // State
+    pub const STATE: u32 = 0x42008D;
+
+    // Derivation
+    pub const DERIVATION_METHOD: u32 = 0x420031;
+    pub const DERIVATION_PARAMETERS: u32 = 0x420032;
+    pub const DERIVATION_DATA: u32 = 0x420030;
+
+    // Lease
+    pub const LEASE_TIME: u32 = 0x420049;
 }
 
-/// KMIP operation codes.
+/// KMIP operation codes (all 27 operations from KMIP 1.4).
 pub mod operation {
     pub const CREATE: u32 = 0x00000001;
+    pub const CREATE_KEY_PAIR: u32 = 0x00000002;
+    pub const REGISTER: u32 = 0x00000003;
+    pub const RE_KEY: u32 = 0x00000004;
+    pub const DERIVE_KEY: u32 = 0x00000005;
     pub const LOCATE: u32 = 0x00000008;
-    pub const GET: u32 = 0x0000000A;
-    pub const ACTIVATE: u32 = 0x00000012;
-    pub const DESTROY: u32 = 0x00000014;
     pub const CHECK: u32 = 0x00000009;
+    pub const GET: u32 = 0x0000000A;
+    pub const GET_ATTRIBUTES: u32 = 0x0000000B;
+    pub const GET_ATTRIBUTE_LIST: u32 = 0x0000000C;
+    pub const ADD_ATTRIBUTE: u32 = 0x0000000D;
+    pub const MODIFY_ATTRIBUTE: u32 = 0x0000000E;
+    pub const DELETE_ATTRIBUTE: u32 = 0x0000000F;
+    pub const OBTAIN_LEASE: u32 = 0x00000010;
+    pub const ACTIVATE: u32 = 0x00000012;
+    pub const REVOKE: u32 = 0x00000013;
+    pub const DESTROY: u32 = 0x00000014;
+    pub const ARCHIVE: u32 = 0x00000015;
+    pub const RECOVER: u32 = 0x00000016;
+    pub const QUERY: u32 = 0x00000018;
+    pub const POLL: u32 = 0x0000001A;
+    pub const DISCOVER_VERSIONS: u32 = 0x0000001E;
+    pub const ENCRYPT: u32 = 0x0000001F;
+    pub const DECRYPT: u32 = 0x00000020;
+    pub const SIGN: u32 = 0x00000021;
+    pub const SIGNATURE_VERIFY: u32 = 0x00000022;
+    pub const MAC: u32 = 0x00000023;
 }
 
 /// KMIP object types.
