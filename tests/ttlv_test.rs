@@ -584,3 +584,73 @@ fn decoded_structure_has_correct_length() {
     assert_eq!(decoded.length, 16);
     assert_eq!(decoded.total_length, 24);
 }
+
+// ── Security hardening tests ────────────────────────────────────────
+
+#[test]
+fn rejects_declared_length_exceeding_buffer() {
+    // Header claiming 1000 bytes of value, but only 10 bytes provided
+    let mut buf = vec![0u8; 18]; // 8 header + 10 body
+    buf[0] = 0x42; buf[1] = 0x00; buf[2] = 0x01; // tag = 0x420001
+    buf[3] = 0x07; // type = TextString
+    buf[4..8].copy_from_slice(&1000u32.to_be_bytes()); // length = 1000
+    let result = decode_ttlv(&buf, 0);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("exceeds buffer"), "Expected 'exceeds buffer' in: {}", err_msg);
+}
+
+#[test]
+fn accepts_declared_length_that_exactly_fits() {
+    let encoded = encode_integer(0x420001, 42);
+    let decoded = decode_ttlv(&encoded, 0).unwrap();
+    assert_eq!(decoded.value.as_integer(), Some(42));
+}
+
+#[test]
+fn rejects_zero_length_buffer() {
+    let result = decode_ttlv(&[], 0);
+    assert!(result.is_err());
+}
+
+#[test]
+fn rejects_structures_nested_deeper_than_32_levels() {
+    // Build 33 levels of nesting
+    let mut inner = encode_integer(0x420001, 42);
+    for _ in 0..33 {
+        inner = encode_structure(0x420001, &[inner]);
+    }
+    let result = decode_ttlv(&inner, 0);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("depth"), "Expected 'depth' in: {}", err_msg);
+}
+
+#[test]
+fn accepts_structures_nested_exactly_32_levels() {
+    // Build 31 wrapping levels (root is depth 0, innermost is depth 31)
+    let mut inner = encode_integer(0x420001, 42);
+    for _ in 0..31 {
+        inner = encode_structure(0x420001, &[inner]);
+    }
+    let decoded = decode_ttlv(&inner, 0).unwrap();
+    assert_eq!(decoded.item_type, item_type::STRUCTURE);
+}
+
+#[test]
+fn rejects_truncated_header() {
+    let buf = vec![0x42, 0x00, 0x01, 0x02];
+    let result = decode_ttlv(&buf, 0);
+    assert!(result.is_err());
+}
+
+#[test]
+fn handles_integer_with_wrong_length_safely() {
+    // Header: tag=0x420001, type=Integer(0x02), length=3 (should be 4)
+    let mut buf = vec![0u8; 16];
+    buf[0] = 0x42; buf[1] = 0x00; buf[2] = 0x01;
+    buf[3] = 0x02; // type = Integer
+    buf[4..8].copy_from_slice(&3u32.to_be_bytes()); // length = 3 (invalid)
+    // Should either return Err or handle safely — must not panic
+    let _ = decode_ttlv(&buf, 0);
+}
