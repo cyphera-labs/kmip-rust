@@ -55,6 +55,8 @@ pub enum TtlvValue {
 pub enum TtlvError {
     BufferTooShort,
     InvalidUtf8,
+    LengthExceedsBuffer(usize, usize),
+    MaxDepthExceeded,
 }
 
 impl fmt::Display for TtlvError {
@@ -62,6 +64,10 @@ impl fmt::Display for TtlvError {
         match self {
             TtlvError::BufferTooShort => write!(f, "TTLV buffer too short for header"),
             TtlvError::InvalidUtf8 => write!(f, "TTLV text string is not valid UTF-8"),
+            TtlvError::LengthExceedsBuffer(declared, available) => {
+                write!(f, "TTLV: declared length {} exceeds buffer (have {} bytes)", declared, available)
+            }
+            TtlvError::MaxDepthExceeded => write!(f, "TTLV: maximum nesting depth exceeded"),
         }
     }
 }
@@ -139,8 +145,18 @@ pub fn encode_date_time(tag: u32, timestamp: i64) -> Vec<u8> {
     encode_ttlv(tag, item_type::DATE_TIME, &timestamp.to_be_bytes())
 }
 
+/// Maximum nesting depth for TTLV structures.
+const MAX_DECODE_DEPTH: usize = 32;
+
 /// Decode a TTLV buffer into a parsed item.
 pub fn decode_ttlv(buf: &[u8], offset: usize) -> Result<TtlvItem, TtlvError> {
+    decode_ttlv_depth(buf, offset, 0)
+}
+
+fn decode_ttlv_depth(buf: &[u8], offset: usize, depth: usize) -> Result<TtlvItem, TtlvError> {
+    if depth > MAX_DECODE_DEPTH {
+        return Err(TtlvError::MaxDepthExceeded);
+    }
     if buf.len() - offset < 8 {
         return Err(TtlvError::BufferTooShort);
     }
@@ -159,13 +175,18 @@ pub fn decode_ttlv(buf: &[u8], offset: usize) -> Result<TtlvItem, TtlvError> {
     let total_length = 8 + padded;
     let value_start = offset + 8;
 
+    // Bounds check: ensure declared length fits within buffer.
+    if value_start + padded > buf.len() {
+        return Err(TtlvError::LengthExceedsBuffer(length, buf.len() - value_start));
+    }
+
     let value = match typ {
         item_type::STRUCTURE => {
             let mut children = Vec::new();
             let mut pos = value_start;
             let end = value_start + length;
             while pos < end {
-                let child = decode_ttlv(buf, pos)?;
+                let child = decode_ttlv_depth(buf, pos, depth + 1)?;
                 pos += child.total_length;
                 children.push(child);
             }

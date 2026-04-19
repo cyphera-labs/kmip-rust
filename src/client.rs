@@ -38,6 +38,9 @@ use crate::operations::*;
 use crate::tags::{algorithm, tag};
 use crate::ttlv::find_child;
 
+/// Maximum KMIP response size (16MB).
+const MAX_RESPONSE_SIZE: usize = 16 * 1024 * 1024;
+
 /// KMIP client for mTLS connections to KMIP servers.
 pub struct KmipClient {
     host: String,
@@ -401,19 +404,35 @@ impl KmipClient {
     /// Send a KMIP request and receive the response.
     fn send(&mut self, request: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let stream = self.connect()?;
-        stream.write_all(request)?;
-        stream.flush()?;
+        if let Err(e) = stream.write_all(request).and_then(|_| stream.flush()) {
+            self.stream = None; // Mark connection as stale.
+            return Err(Box::new(e));
+        }
 
         // Read the TTLV header (8 bytes) to determine total length
         let mut header = [0u8; 8];
-        stream.read_exact(&mut header)?;
+        if let Err(e) = stream.read_exact(&mut header) {
+            self.stream = None; // Mark connection as stale.
+            return Err(Box::new(e));
+        }
 
         let value_length = u32::from_be_bytes([header[4], header[5], header[6], header[7]]) as usize;
-        let total_length = 8 + value_length;
 
+        // Validate response size before allocating.
+        if value_length > MAX_RESPONSE_SIZE {
+            self.stream = None; // Mark connection as stale.
+            return Err(format!(
+                "KMIP: response too large ({} bytes, max {})", value_length, MAX_RESPONSE_SIZE
+            ).into());
+        }
+
+        let total_length = 8 + value_length;
         let mut buf = vec![0u8; total_length];
         buf[..8].copy_from_slice(&header);
-        stream.read_exact(&mut buf[8..])?;
+        if let Err(e) = stream.read_exact(&mut buf[8..]) {
+            self.stream = None; // Mark connection as stale.
+            return Err(Box::new(e));
+        }
 
         Ok(buf)
     }
