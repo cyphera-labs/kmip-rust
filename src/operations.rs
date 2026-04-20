@@ -126,18 +126,36 @@ impl std::error::Error for KmipError {}
 // ---------------------------------------------------------------------------
 
 /// Build the request header (included in every request).
-fn build_request_header(batch_count: i32) -> Vec<u8> {
-    encode_structure(tag::REQUEST_HEADER, &[
+/// Includes Authentication structure when credentials are provided (fixes MEDIUM-D2/M4).
+fn build_request_header(batch_count: i32, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    let mut parts = vec![
         encode_structure(tag::PROTOCOL_VERSION, &[
             encode_integer(tag::PROTOCOL_VERSION_MAJOR, PROTOCOL_MAJOR),
             encode_integer(tag::PROTOCOL_VERSION_MINOR, PROTOCOL_MINOR),
         ]),
-        encode_integer(tag::BATCH_COUNT, batch_count),
-    ])
+    ];
+
+    // KMIP 1.4 §6.1: Authentication → Credential → CredentialType + CredentialValue
+    // CredentialType 0x00000001 = UsernameAndPassword
+    // CredentialValue contains Username (0x420099) + Password (0x4200A1)
+    if let Some(cred) = credential {
+        let credential_value = encode_structure(tag::CREDENTIAL_VALUE, &[
+            encode_text_string(tag::USERNAME, &cred.username),
+            encode_text_string(tag::PASSWORD, &cred.password),
+        ]);
+        let credential_struct = encode_structure(tag::CREDENTIAL, &[
+            encode_enum(tag::CREDENTIAL_TYPE, 1), // UsernameAndPassword
+            credential_value,
+        ]);
+        parts.push(encode_structure(tag::AUTHENTICATION, &[credential_struct]));
+    }
+
+    parts.push(encode_integer(tag::BATCH_COUNT, batch_count));
+    encode_structure(tag::REQUEST_HEADER, &parts)
 }
 
 /// Build a request with just a UID in the payload.
-fn build_uid_only_request(op: u32, unique_id: &str) -> Vec<u8> {
+fn build_uid_only_request(op: u32, unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
     ]);
@@ -146,20 +164,20 @@ fn build_uid_only_request(op: u32, unique_id: &str) -> Vec<u8> {
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a request with an empty payload.
-fn build_empty_payload_request(op: u32) -> Vec<u8> {
+fn build_empty_payload_request(op: u32, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[]);
     let batch_item = encode_structure(tag::BATCH_ITEM, &[
         encode_enum(tag::OPERATION, op),
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
@@ -169,7 +187,7 @@ fn build_empty_payload_request(op: u32) -> Vec<u8> {
 // ---------------------------------------------------------------------------
 
 /// Build a Locate request -- find keys by name.
-pub fn build_locate_request(name: &str) -> Vec<u8> {
+pub fn build_locate_request(name: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_structure(tag::ATTRIBUTE, &[
             encode_text_string(tag::ATTRIBUTE_NAME, "Name"),
@@ -186,18 +204,18 @@ pub fn build_locate_request(name: &str) -> Vec<u8> {
     ]);
 
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a Get request -- fetch key material by unique ID.
-pub fn build_get_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::GET, unique_id)
+pub fn build_get_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::GET, unique_id, credential)
 }
 
 /// Build a Create request -- create a new symmetric key.
-pub fn build_create_request(name: &str, algo: u32, length: i32) -> Vec<u8> {
+pub fn build_create_request(name: &str, algo: u32, length: i32, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_enum(tag::OBJECT_TYPE, object_type::SYMMETRIC_KEY),
         encode_structure(tag::TEMPLATE_ATTRIBUTE, &[
@@ -229,13 +247,13 @@ pub fn build_create_request(name: &str, algo: u32, length: i32) -> Vec<u8> {
     ]);
 
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a CreateKeyPair request.
-pub fn build_create_key_pair_request(name: &str, algo: u32, length: i32) -> Vec<u8> {
+pub fn build_create_key_pair_request(name: &str, algo: u32, length: i32, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_structure(tag::TEMPLATE_ATTRIBUTE, &[
             encode_structure(tag::ATTRIBUTE, &[
@@ -266,7 +284,7 @@ pub fn build_create_key_pair_request(name: &str, algo: u32, length: i32) -> Vec<
     ]);
 
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
@@ -278,6 +296,7 @@ pub fn build_register_request(
     name: &str,
     algo: u32,
     length: i32,
+    credential: Option<&crate::client::KmipCredential>,
 ) -> Vec<u8> {
     let mut payload_children = vec![
         encode_enum(tag::OBJECT_TYPE, obj_type),
@@ -312,14 +331,14 @@ pub fn build_register_request(
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a ReKey request.
-pub fn build_re_key_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::RE_KEY, unique_id)
+pub fn build_re_key_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::RE_KEY, unique_id, credential)
 }
 
 /// Build a DeriveKey request.
@@ -328,6 +347,7 @@ pub fn build_derive_key_request(
     derivation_data: &[u8],
     name: &str,
     length: i32,
+    credential: Option<&crate::client::KmipCredential>,
 ) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
@@ -353,28 +373,28 @@ pub fn build_derive_key_request(
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a Check request.
-pub fn build_check_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::CHECK, unique_id)
+pub fn build_check_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::CHECK, unique_id, credential)
 }
 
 /// Build a GetAttributes request.
-pub fn build_get_attributes_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::GET_ATTRIBUTES, unique_id)
+pub fn build_get_attributes_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::GET_ATTRIBUTES, unique_id, credential)
 }
 
 /// Build a GetAttributeList request.
-pub fn build_get_attribute_list_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::GET_ATTRIBUTE_LIST, unique_id)
+pub fn build_get_attribute_list_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::GET_ATTRIBUTE_LIST, unique_id, credential)
 }
 
 /// Build an AddAttribute request.
-pub fn build_add_attribute_request(unique_id: &str, attr_name: &str, attr_value: &str) -> Vec<u8> {
+pub fn build_add_attribute_request(unique_id: &str, attr_name: &str, attr_value: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_structure(tag::ATTRIBUTE, &[
@@ -387,13 +407,13 @@ pub fn build_add_attribute_request(unique_id: &str, attr_name: &str, attr_value:
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a ModifyAttribute request.
-pub fn build_modify_attribute_request(unique_id: &str, attr_name: &str, attr_value: &str) -> Vec<u8> {
+pub fn build_modify_attribute_request(unique_id: &str, attr_name: &str, attr_value: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_structure(tag::ATTRIBUTE, &[
@@ -406,13 +426,13 @@ pub fn build_modify_attribute_request(unique_id: &str, attr_name: &str, attr_val
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a DeleteAttribute request.
-pub fn build_delete_attribute_request(unique_id: &str, attr_name: &str) -> Vec<u8> {
+pub fn build_delete_attribute_request(unique_id: &str, attr_name: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_structure(tag::ATTRIBUTE, &[
@@ -424,23 +444,23 @@ pub fn build_delete_attribute_request(unique_id: &str, attr_name: &str) -> Vec<u
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build an ObtainLease request.
-pub fn build_obtain_lease_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::OBTAIN_LEASE, unique_id)
+pub fn build_obtain_lease_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::OBTAIN_LEASE, unique_id, credential)
 }
 
 /// Build an Activate request.
-pub fn build_activate_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::ACTIVATE, unique_id)
+pub fn build_activate_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::ACTIVATE, unique_id, credential)
 }
 
 /// Build a Revoke request with a revocation reason.
-pub fn build_revoke_request(unique_id: &str, reason: u32) -> Vec<u8> {
+pub fn build_revoke_request(unique_id: &str, reason: u32, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_structure(tag::REVOCATION_REASON, &[
@@ -452,43 +472,43 @@ pub fn build_revoke_request(unique_id: &str, reason: u32) -> Vec<u8> {
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a Destroy request.
-pub fn build_destroy_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::DESTROY, unique_id)
+pub fn build_destroy_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::DESTROY, unique_id, credential)
 }
 
 /// Build an Archive request.
-pub fn build_archive_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::ARCHIVE, unique_id)
+pub fn build_archive_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::ARCHIVE, unique_id, credential)
 }
 
 /// Build a Recover request.
-pub fn build_recover_request(unique_id: &str) -> Vec<u8> {
-    build_uid_only_request(operation::RECOVER, unique_id)
+pub fn build_recover_request(unique_id: &str, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_uid_only_request(operation::RECOVER, unique_id, credential)
 }
 
 /// Build a Query request.
-pub fn build_query_request() -> Vec<u8> {
-    build_empty_payload_request(operation::QUERY)
+pub fn build_query_request(credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_empty_payload_request(operation::QUERY, credential)
 }
 
 /// Build a Poll request.
-pub fn build_poll_request() -> Vec<u8> {
-    build_empty_payload_request(operation::POLL)
+pub fn build_poll_request(credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_empty_payload_request(operation::POLL, credential)
 }
 
 /// Build a DiscoverVersions request.
-pub fn build_discover_versions_request() -> Vec<u8> {
-    build_empty_payload_request(operation::DISCOVER_VERSIONS)
+pub fn build_discover_versions_request(credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
+    build_empty_payload_request(operation::DISCOVER_VERSIONS, credential)
 }
 
 /// Build an Encrypt request.
-pub fn build_encrypt_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
+pub fn build_encrypt_request(unique_id: &str, data: &[u8], credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_byte_string(tag::DATA, data),
@@ -498,13 +518,13 @@ pub fn build_encrypt_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a Decrypt request.
-pub fn build_decrypt_request(unique_id: &str, data: &[u8], nonce: Option<&[u8]>) -> Vec<u8> {
+pub fn build_decrypt_request(unique_id: &str, data: &[u8], nonce: Option<&[u8]>, credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let mut payload_children = vec![
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_byte_string(tag::DATA, data),
@@ -520,13 +540,13 @@ pub fn build_decrypt_request(unique_id: &str, data: &[u8], nonce: Option<&[u8]>)
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a Sign request.
-pub fn build_sign_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
+pub fn build_sign_request(unique_id: &str, data: &[u8], credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_byte_string(tag::DATA, data),
@@ -536,13 +556,13 @@ pub fn build_sign_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a SignatureVerify request.
-pub fn build_signature_verify_request(unique_id: &str, data: &[u8], signature: &[u8]) -> Vec<u8> {
+pub fn build_signature_verify_request(unique_id: &str, data: &[u8], signature: &[u8], credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_byte_string(tag::DATA, data),
@@ -553,13 +573,13 @@ pub fn build_signature_verify_request(unique_id: &str, data: &[u8], signature: &
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }
 
 /// Build a MAC request.
-pub fn build_mac_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
+pub fn build_mac_request(unique_id: &str, data: &[u8], credential: Option<&crate::client::KmipCredential>) -> Vec<u8> {
     let payload = encode_structure(tag::REQUEST_PAYLOAD, &[
         encode_text_string(tag::UNIQUE_IDENTIFIER, unique_id),
         encode_byte_string(tag::DATA, data),
@@ -569,7 +589,7 @@ pub fn build_mac_request(unique_id: &str, data: &[u8]) -> Vec<u8> {
         payload,
     ]);
     encode_structure(tag::REQUEST_MESSAGE, &[
-        build_request_header(1),
+        build_request_header(1, credential),
         batch_item,
     ])
 }

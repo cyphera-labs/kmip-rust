@@ -15,7 +15,15 @@ pub mod tag {
     pub const PROTOCOL_VERSION: u32 = 0x420069;
     pub const PROTOCOL_VERSION_MAJOR: u32 = 0x42006A;
     pub const PROTOCOL_VERSION_MINOR: u32 = 0x42006B;
+    pub const AUTHENTICATION: u32 = 0x42000C;
     pub const BATCH_COUNT: u32 = 0x42000D;
+    pub const CREDENTIAL: u32 = 0x420023;
+    pub const CREDENTIAL_TYPE: u32 = 0x420024;
+    pub const CREDENTIAL_VALUE: u32 = 0x420025;
+
+    // Credential fields (UsernameAndPassword)
+    pub const USERNAME: u32 = 0x420099;
+    pub const PASSWORD: u32 = 0x4200A1;
     pub const BATCH_ITEM: u32 = 0x42000F;
     pub const OPERATION: u32 = 0x42005C;
     pub const REQUEST_PAYLOAD: u32 = 0x420079;

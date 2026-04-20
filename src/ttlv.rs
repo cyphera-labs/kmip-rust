@@ -25,7 +25,7 @@ pub mod item_type {
 }
 
 /// A decoded TTLV item.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TtlvItem {
     pub tag: u32,
     pub item_type: u8,
@@ -35,7 +35,7 @@ pub struct TtlvItem {
 }
 
 /// Possible TTLV values.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TtlvValue {
     Structure(Vec<TtlvItem>),
     Integer(i32),

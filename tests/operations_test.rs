@@ -47,7 +47,7 @@ fn build_success_response(op: u32, payload_children: &[Vec<u8>]) -> Vec<u8> {
 
 #[test]
 fn locate_request_is_valid_structure() {
-    let req = build_locate_request("test-key");
+    let req = build_locate_request("test-key", None);
     let decoded = decode_request(&req);
     assert_eq!(decoded.tag, tag::REQUEST_MESSAGE);
     assert_eq!(decoded.item_type, item_type::STRUCTURE);
@@ -55,7 +55,7 @@ fn locate_request_is_valid_structure() {
 
 #[test]
 fn locate_request_has_protocol_version() {
-    let decoded = decode_request(&build_locate_request("test-key"));
+    let decoded = decode_request(&build_locate_request("test-key", None));
     let header = find_child(&decoded, tag::REQUEST_HEADER).unwrap();
     let version = find_child(header, tag::PROTOCOL_VERSION).unwrap();
     let major = find_child(version, tag::PROTOCOL_VERSION_MAJOR).unwrap();
@@ -66,7 +66,7 @@ fn locate_request_has_protocol_version() {
 
 #[test]
 fn locate_request_has_batch_count_1() {
-    let decoded = decode_request(&build_locate_request("test-key"));
+    let decoded = decode_request(&build_locate_request("test-key", None));
     let header = find_child(&decoded, tag::REQUEST_HEADER).unwrap();
     let batch_count = find_child(header, tag::BATCH_COUNT).unwrap();
     assert_eq!(batch_count.value.as_integer(), Some(1));
@@ -74,13 +74,13 @@ fn locate_request_has_batch_count_1() {
 
 #[test]
 fn locate_request_has_locate_operation() {
-    let decoded = decode_request(&build_locate_request("test-key"));
+    let decoded = decode_request(&build_locate_request("test-key", None));
     assert_eq!(extract_operation(&decoded), operation::LOCATE);
 }
 
 #[test]
 fn locate_request_contains_name_attribute() {
-    let decoded = decode_request(&build_locate_request("my-aes-key"));
+    let decoded = decode_request(&build_locate_request("my-aes-key", None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let attr = find_child(payload, tag::ATTRIBUTE).unwrap();
@@ -101,7 +101,7 @@ fn locate_request_contains_name_attribute() {
 
 #[test]
 fn get_request_is_valid_structure() {
-    let req = build_get_request("uid-123");
+    let req = build_get_request("uid-123", None);
     let decoded = decode_request(&req);
     assert_eq!(decoded.tag, tag::REQUEST_MESSAGE);
     assert_eq!(decoded.item_type, item_type::STRUCTURE);
@@ -109,19 +109,19 @@ fn get_request_is_valid_structure() {
 
 #[test]
 fn get_request_has_get_operation() {
-    let decoded = decode_request(&build_get_request("uid-123"));
+    let decoded = decode_request(&build_get_request("uid-123", None));
     assert_eq!(extract_operation(&decoded), operation::GET);
 }
 
 #[test]
 fn get_request_contains_unique_identifier() {
-    let decoded = decode_request(&build_get_request("uid-abc-def"));
+    let decoded = decode_request(&build_get_request("uid-abc-def", None));
     assert_eq!(extract_uid(&decoded), "uid-abc-def");
 }
 
 #[test]
 fn get_request_has_protocol_version() {
-    let decoded = decode_request(&build_get_request("uid-123"));
+    let decoded = decode_request(&build_get_request("uid-123", None));
     let header = find_child(&decoded, tag::REQUEST_HEADER).unwrap();
     let version = find_child(header, tag::PROTOCOL_VERSION).unwrap();
     assert!(find_child(version, tag::PROTOCOL_VERSION_MAJOR).is_some());
@@ -134,7 +134,7 @@ fn get_request_has_protocol_version() {
 
 #[test]
 fn create_request_is_valid_structure() {
-    let req = build_create_request("new-key", algorithm::AES, 256);
+    let req = build_create_request("new-key", algorithm::AES, 256, None);
     let decoded = decode_request(&req);
     assert_eq!(decoded.tag, tag::REQUEST_MESSAGE);
     assert_eq!(decoded.item_type, item_type::STRUCTURE);
@@ -142,13 +142,13 @@ fn create_request_is_valid_structure() {
 
 #[test]
 fn create_request_has_create_operation() {
-    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256, None));
     assert_eq!(extract_operation(&decoded), operation::CREATE);
 }
 
 #[test]
 fn create_request_specifies_symmetric_key_object_type() {
-    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let obj_type = find_child(payload, tag::OBJECT_TYPE).unwrap();
@@ -157,7 +157,7 @@ fn create_request_specifies_symmetric_key_object_type() {
 
 #[test]
 fn create_request_has_template_attribute() {
-    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("new-key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE);
@@ -166,7 +166,7 @@ fn create_request_has_template_attribute() {
 
 #[test]
 fn create_request_contains_algorithm_attribute() {
-    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -184,7 +184,7 @@ fn create_request_contains_algorithm_attribute() {
 
 #[test]
 fn create_request_contains_length_attribute() {
-    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -202,7 +202,7 @@ fn create_request_contains_length_attribute() {
 
 #[test]
 fn create_request_contains_usage_mask() {
-    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -221,7 +221,7 @@ fn create_request_contains_usage_mask() {
 
 #[test]
 fn create_request_contains_name() {
-    let decoded = decode_request(&build_create_request("my-new-key", algorithm::AES, 256));
+    let decoded = decode_request(&build_create_request("my-new-key", algorithm::AES, 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -240,7 +240,7 @@ fn create_request_contains_name() {
 
 #[test]
 fn create_request_custom_algorithm() {
-    let decoded = decode_request(&build_create_request("key", algorithm::TRIPLE_DES, 192));
+    let decoded = decode_request(&build_create_request("key", algorithm::TRIPLE_DES, 192, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -258,7 +258,7 @@ fn create_request_custom_algorithm() {
 
 #[test]
 fn create_request_custom_length() {
-    let decoded = decode_request(&build_create_request("key", algorithm::AES, 128));
+    let decoded = decode_request(&build_create_request("key", algorithm::AES, 128, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -280,13 +280,13 @@ fn create_request_custom_length() {
 
 #[test]
 fn activate_request_has_activate_operation() {
-    let decoded = decode_request(&build_activate_request("uid-act"));
+    let decoded = decode_request(&build_activate_request("uid-act", None));
     assert_eq!(extract_operation(&decoded), operation::ACTIVATE);
 }
 
 #[test]
 fn activate_request_contains_uid() {
-    let decoded = decode_request(&build_activate_request("uid-act"));
+    let decoded = decode_request(&build_activate_request("uid-act", None));
     assert_eq!(extract_uid(&decoded), "uid-act");
 }
 
@@ -296,13 +296,13 @@ fn activate_request_contains_uid() {
 
 #[test]
 fn destroy_request_has_destroy_operation() {
-    let decoded = decode_request(&build_destroy_request("uid-del"));
+    let decoded = decode_request(&build_destroy_request("uid-del", None));
     assert_eq!(extract_operation(&decoded), operation::DESTROY);
 }
 
 #[test]
 fn destroy_request_contains_uid() {
-    let decoded = decode_request(&build_destroy_request("uid-del"));
+    let decoded = decode_request(&build_destroy_request("uid-del", None));
     assert_eq!(extract_uid(&decoded), "uid-del");
 }
 
@@ -312,13 +312,13 @@ fn destroy_request_contains_uid() {
 
 #[test]
 fn check_request_has_check_operation() {
-    let decoded = decode_request(&build_check_request("uid-chk"));
+    let decoded = decode_request(&build_check_request("uid-chk", None));
     assert_eq!(extract_operation(&decoded), operation::CHECK);
 }
 
 #[test]
 fn check_request_contains_uid() {
-    let decoded = decode_request(&build_check_request("uid-chk"));
+    let decoded = decode_request(&build_check_request("uid-chk", None));
     assert_eq!(extract_uid(&decoded), "uid-chk");
 }
 
@@ -328,13 +328,13 @@ fn check_request_contains_uid() {
 
 #[test]
 fn create_key_pair_request_has_correct_operation() {
-    let decoded = decode_request(&build_create_key_pair_request("kp", algorithm::RSA, 2048));
+    let decoded = decode_request(&build_create_key_pair_request("kp", algorithm::RSA, 2048, None));
     assert_eq!(extract_operation(&decoded), operation::CREATE_KEY_PAIR);
 }
 
 #[test]
 fn create_key_pair_request_has_sign_verify_usage_mask() {
-    let decoded = decode_request(&build_create_key_pair_request("kp", algorithm::RSA, 2048));
+    let decoded = decode_request(&build_create_key_pair_request("kp", algorithm::RSA, 2048, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let tmpl = find_child(payload, tag::TEMPLATE_ATTRIBUTE).unwrap();
@@ -358,7 +358,7 @@ fn create_key_pair_request_has_sign_verify_usage_mask() {
 #[test]
 fn register_request_has_register_operation() {
     let decoded = decode_request(&build_register_request(
-        object_type::SYMMETRIC_KEY, &[1, 2, 3], "reg-key", algorithm::AES, 128,
+        object_type::SYMMETRIC_KEY, &[1, 2, 3], "reg-key", algorithm::AES, 128, None,
     ));
     assert_eq!(extract_operation(&decoded), operation::REGISTER);
 }
@@ -367,7 +367,7 @@ fn register_request_has_register_operation() {
 fn register_request_contains_key_material() {
     let material = vec![0xAA, 0xBB, 0xCC, 0xDD];
     let decoded = decode_request(&build_register_request(
-        object_type::SYMMETRIC_KEY, &material, "reg-key", algorithm::AES, 128,
+        object_type::SYMMETRIC_KEY, &material, "reg-key", algorithm::AES, 128, None,
     ));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
@@ -381,7 +381,7 @@ fn register_request_contains_key_material() {
 #[test]
 fn register_request_includes_name_when_nonempty() {
     let decoded = decode_request(&build_register_request(
-        object_type::SYMMETRIC_KEY, &[1], "my-reg-key", algorithm::AES, 128,
+        object_type::SYMMETRIC_KEY, &[1], "my-reg-key", algorithm::AES, 128, None,
     ));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
@@ -392,7 +392,7 @@ fn register_request_includes_name_when_nonempty() {
 #[test]
 fn register_request_omits_name_when_empty() {
     let decoded = decode_request(&build_register_request(
-        object_type::SYMMETRIC_KEY, &[1], "", algorithm::AES, 128,
+        object_type::SYMMETRIC_KEY, &[1], "", algorithm::AES, 128, None,
     ));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
@@ -406,13 +406,13 @@ fn register_request_omits_name_when_empty() {
 
 #[test]
 fn re_key_request_has_re_key_operation() {
-    let decoded = decode_request(&build_re_key_request("uid-rk"));
+    let decoded = decode_request(&build_re_key_request("uid-rk", None));
     assert_eq!(extract_operation(&decoded), operation::RE_KEY);
 }
 
 #[test]
 fn re_key_request_contains_uid() {
-    let decoded = decode_request(&build_re_key_request("uid-rk"));
+    let decoded = decode_request(&build_re_key_request("uid-rk", None));
     assert_eq!(extract_uid(&decoded), "uid-rk");
 }
 
@@ -422,14 +422,14 @@ fn re_key_request_contains_uid() {
 
 #[test]
 fn derive_key_request_has_derive_key_operation() {
-    let decoded = decode_request(&build_derive_key_request("uid-dk", &[1, 2], "derived", 256));
+    let decoded = decode_request(&build_derive_key_request("uid-dk", &[1, 2], "derived", 256, None));
     assert_eq!(extract_operation(&decoded), operation::DERIVE_KEY);
 }
 
 #[test]
 fn derive_key_request_contains_derivation_data() {
     let data = vec![0x01, 0x02, 0x03];
-    let decoded = decode_request(&build_derive_key_request("uid-dk", &data, "derived", 256));
+    let decoded = decode_request(&build_derive_key_request("uid-dk", &data, "derived", 256, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let params = find_child(payload, tag::DERIVATION_PARAMETERS).unwrap();
@@ -443,13 +443,13 @@ fn derive_key_request_contains_derivation_data() {
 
 #[test]
 fn get_attributes_request_has_correct_operation() {
-    let decoded = decode_request(&build_get_attributes_request("uid-ga"));
+    let decoded = decode_request(&build_get_attributes_request("uid-ga", None));
     assert_eq!(extract_operation(&decoded), operation::GET_ATTRIBUTES);
 }
 
 #[test]
 fn get_attribute_list_request_has_correct_operation() {
-    let decoded = decode_request(&build_get_attribute_list_request("uid-gal"));
+    let decoded = decode_request(&build_get_attribute_list_request("uid-gal", None));
     assert_eq!(extract_operation(&decoded), operation::GET_ATTRIBUTE_LIST);
 }
 
@@ -459,13 +459,13 @@ fn get_attribute_list_request_has_correct_operation() {
 
 #[test]
 fn add_attribute_request_has_correct_operation() {
-    let decoded = decode_request(&build_add_attribute_request("uid-aa", "Contact", "admin@example.com"));
+    let decoded = decode_request(&build_add_attribute_request("uid-aa", "Contact", "admin@example.com", None));
     assert_eq!(extract_operation(&decoded), operation::ADD_ATTRIBUTE);
 }
 
 #[test]
 fn add_attribute_request_contains_attribute() {
-    let decoded = decode_request(&build_add_attribute_request("uid-aa", "Contact", "admin@example.com"));
+    let decoded = decode_request(&build_add_attribute_request("uid-aa", "Contact", "admin@example.com", None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let attr = find_child(payload, tag::ATTRIBUTE).unwrap();
@@ -481,7 +481,7 @@ fn add_attribute_request_contains_attribute() {
 
 #[test]
 fn modify_attribute_request_has_correct_operation() {
-    let decoded = decode_request(&build_modify_attribute_request("uid-ma", "Contact", "new@example.com"));
+    let decoded = decode_request(&build_modify_attribute_request("uid-ma", "Contact", "new@example.com", None));
     assert_eq!(extract_operation(&decoded), operation::MODIFY_ATTRIBUTE);
 }
 
@@ -491,13 +491,13 @@ fn modify_attribute_request_has_correct_operation() {
 
 #[test]
 fn delete_attribute_request_has_correct_operation() {
-    let decoded = decode_request(&build_delete_attribute_request("uid-da", "Contact"));
+    let decoded = decode_request(&build_delete_attribute_request("uid-da", "Contact", None));
     assert_eq!(extract_operation(&decoded), operation::DELETE_ATTRIBUTE);
 }
 
 #[test]
 fn delete_attribute_request_contains_attribute_name() {
-    let decoded = decode_request(&build_delete_attribute_request("uid-da", "Contact"));
+    let decoded = decode_request(&build_delete_attribute_request("uid-da", "Contact", None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let attr = find_child(payload, tag::ATTRIBUTE).unwrap();
@@ -511,7 +511,7 @@ fn delete_attribute_request_contains_attribute_name() {
 
 #[test]
 fn obtain_lease_request_has_correct_operation() {
-    let decoded = decode_request(&build_obtain_lease_request("uid-ol"));
+    let decoded = decode_request(&build_obtain_lease_request("uid-ol", None));
     assert_eq!(extract_operation(&decoded), operation::OBTAIN_LEASE);
 }
 
@@ -521,13 +521,13 @@ fn obtain_lease_request_has_correct_operation() {
 
 #[test]
 fn revoke_request_has_revoke_operation() {
-    let decoded = decode_request(&build_revoke_request("uid-rev", 1));
+    let decoded = decode_request(&build_revoke_request("uid-rev", 1, None));
     assert_eq!(extract_operation(&decoded), operation::REVOKE);
 }
 
 #[test]
 fn revoke_request_contains_revocation_reason() {
-    let decoded = decode_request(&build_revoke_request("uid-rev", 5));
+    let decoded = decode_request(&build_revoke_request("uid-rev", 5, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let reason = find_child(payload, tag::REVOCATION_REASON).unwrap();
@@ -541,13 +541,13 @@ fn revoke_request_contains_revocation_reason() {
 
 #[test]
 fn archive_request_has_archive_operation() {
-    let decoded = decode_request(&build_archive_request("uid-arc"));
+    let decoded = decode_request(&build_archive_request("uid-arc", None));
     assert_eq!(extract_operation(&decoded), operation::ARCHIVE);
 }
 
 #[test]
 fn recover_request_has_recover_operation() {
-    let decoded = decode_request(&build_recover_request("uid-rec"));
+    let decoded = decode_request(&build_recover_request("uid-rec", None));
     assert_eq!(extract_operation(&decoded), operation::RECOVER);
 }
 
@@ -557,19 +557,19 @@ fn recover_request_has_recover_operation() {
 
 #[test]
 fn query_request_has_query_operation() {
-    let decoded = decode_request(&build_query_request());
+    let decoded = decode_request(&build_query_request(None));
     assert_eq!(extract_operation(&decoded), operation::QUERY);
 }
 
 #[test]
 fn poll_request_has_poll_operation() {
-    let decoded = decode_request(&build_poll_request());
+    let decoded = decode_request(&build_poll_request(None));
     assert_eq!(extract_operation(&decoded), operation::POLL);
 }
 
 #[test]
 fn discover_versions_request_has_correct_operation() {
-    let decoded = decode_request(&build_discover_versions_request());
+    let decoded = decode_request(&build_discover_versions_request(None));
     assert_eq!(extract_operation(&decoded), operation::DISCOVER_VERSIONS);
 }
 
@@ -579,14 +579,14 @@ fn discover_versions_request_has_correct_operation() {
 
 #[test]
 fn encrypt_request_has_encrypt_operation() {
-    let decoded = decode_request(&build_encrypt_request("uid-enc", &[1, 2, 3]));
+    let decoded = decode_request(&build_encrypt_request("uid-enc", &[1, 2, 3], None));
     assert_eq!(extract_operation(&decoded), operation::ENCRYPT);
 }
 
 #[test]
 fn encrypt_request_contains_data() {
     let data = vec![0xAA, 0xBB, 0xCC];
-    let decoded = decode_request(&build_encrypt_request("uid-enc", &data));
+    let decoded = decode_request(&build_encrypt_request("uid-enc", &data, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let d = find_child(payload, tag::DATA).unwrap();
@@ -599,14 +599,14 @@ fn encrypt_request_contains_data() {
 
 #[test]
 fn decrypt_request_has_decrypt_operation() {
-    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], None));
+    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], None, None));
     assert_eq!(extract_operation(&decoded), operation::DECRYPT);
 }
 
 #[test]
 fn decrypt_request_with_nonce() {
     let nonce = vec![0x01, 0x02, 0x03, 0x04];
-    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], Some(&nonce)));
+    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], Some(&nonce), None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let iv = find_child(payload, tag::IV_COUNTER_NONCE).unwrap();
@@ -615,7 +615,7 @@ fn decrypt_request_with_nonce() {
 
 #[test]
 fn decrypt_request_without_nonce() {
-    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], None));
+    let decoded = decode_request(&build_decrypt_request("uid-dec", &[1], None, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     assert!(find_child(payload, tag::IV_COUNTER_NONCE).is_none());
@@ -627,7 +627,7 @@ fn decrypt_request_without_nonce() {
 
 #[test]
 fn sign_request_has_sign_operation() {
-    let decoded = decode_request(&build_sign_request("uid-sign", &[1, 2]));
+    let decoded = decode_request(&build_sign_request("uid-sign", &[1, 2], None));
     assert_eq!(extract_operation(&decoded), operation::SIGN);
 }
 
@@ -637,7 +637,7 @@ fn sign_request_has_sign_operation() {
 
 #[test]
 fn signature_verify_request_has_correct_operation() {
-    let decoded = decode_request(&build_signature_verify_request("uid-sv", &[1], &[2]));
+    let decoded = decode_request(&build_signature_verify_request("uid-sv", &[1], &[2], None));
     assert_eq!(extract_operation(&decoded), operation::SIGNATURE_VERIFY);
 }
 
@@ -645,7 +645,7 @@ fn signature_verify_request_has_correct_operation() {
 fn signature_verify_request_contains_data_and_signature() {
     let data = vec![0x01];
     let sig = vec![0x02, 0x03];
-    let decoded = decode_request(&build_signature_verify_request("uid-sv", &data, &sig));
+    let decoded = decode_request(&build_signature_verify_request("uid-sv", &data, &sig, None));
     let batch_item = find_child(&decoded, tag::BATCH_ITEM).unwrap();
     let payload = find_child(batch_item, tag::REQUEST_PAYLOAD).unwrap();
     let d = find_child(payload, tag::DATA).unwrap();
@@ -660,7 +660,7 @@ fn signature_verify_request_contains_data_and_signature() {
 
 #[test]
 fn mac_request_has_mac_operation() {
-    let decoded = decode_request(&build_mac_request("uid-mac", &[1, 2]));
+    let decoded = decode_request(&build_mac_request("uid-mac", &[1, 2], None));
     assert_eq!(extract_operation(&decoded), operation::MAC);
 }
 
@@ -775,7 +775,7 @@ fn parse_get_payload_with_key_material() {
     let result = parse_get_payload(&payload);
     assert_eq!(result.object_type, Some(object_type::SYMMETRIC_KEY));
     assert_eq!(result.unique_identifier.as_deref(), Some("uid-key-1"));
-    assert_eq!(result.key_material, Some(key_bytes));
+    assert_eq!(result.key_material, Some(zeroize::Zeroizing::new(key_bytes)));
 }
 
 #[test]
@@ -1025,7 +1025,7 @@ fn parse_discover_versions_payload_with_versions() {
 
 #[test]
 fn round_trip_locate_request() {
-    let req = build_locate_request("round-trip-key");
+    let req = build_locate_request("round-trip-key", None);
     let decoded = decode_request(&req);
     let re_decoded = decode_ttlv(&req, 0).unwrap();
     assert_eq!(re_decoded.tag, decoded.tag);
@@ -1034,7 +1034,7 @@ fn round_trip_locate_request() {
 
 #[test]
 fn round_trip_get_request() {
-    let req = build_get_request("uid-roundtrip");
+    let req = build_get_request("uid-roundtrip", None);
     let decoded = decode_request(&req);
     assert_eq!(decoded.tag, tag::REQUEST_MESSAGE);
     assert_eq!(extract_uid(&decoded), "uid-roundtrip");
@@ -1042,7 +1042,7 @@ fn round_trip_get_request() {
 
 #[test]
 fn round_trip_create_request() {
-    let req = build_create_request("rt-key", algorithm::AES, 256);
+    let req = build_create_request("rt-key", algorithm::AES, 256, None);
     let decoded = decode_request(&req);
     assert_eq!(decoded.tag, tag::REQUEST_MESSAGE);
     assert_eq!(extract_operation(&decoded), operation::CREATE);

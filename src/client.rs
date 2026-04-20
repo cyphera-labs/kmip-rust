@@ -41,13 +41,26 @@ use crate::ttlv::find_child;
 /// Maximum KMIP response size (16MB).
 const MAX_RESPONSE_SIZE: usize = 16 * 1024 * 1024;
 
+/// KMIP Authentication credential for username/password auth.
+#[derive(Clone)]
+pub struct KmipCredential {
+    pub username: String,
+    pub password: String,
+}
+
 /// KMIP client for mTLS connections to KMIP servers.
+///
+/// # Thread Safety
+///
+/// `KmipClient` is `Send` but not `Sync`. For concurrent use, wrap in
+/// `Arc<Mutex<KmipClient>>`.
 pub struct KmipClient {
     host: String,
     port: u16,
     timeout: Duration,
     tls_config: Arc<ClientConfig>,
     stream: Option<StreamOwned<ClientConnection, TcpStream>>,
+    credential: Option<KmipCredential>,
 }
 
 impl KmipClient {
@@ -96,7 +109,22 @@ impl KmipClient {
             timeout: Duration::from_millis(timeout_ms.unwrap_or(10000)),
             tls_config: Arc::new(config),
             stream: None,
+            credential: None,
         })
+    }
+
+    /// Set KMIP authentication credentials (username/password).
+    /// Credentials are included in every request header when set (fixes MEDIUM-D2/M4).
+    pub fn set_credentials(&mut self, username: &str, password: &str) {
+        self.credential = Some(KmipCredential {
+            username: username.to_string(),
+            password: password.to_string(),
+        });
+    }
+
+    /// Get the current credential (used by operations module).
+    pub(crate) fn credential(&self) -> Option<&KmipCredential> {
+        self.credential.as_ref()
     }
 
     // -----------------------------------------------------------------------
@@ -105,7 +133,7 @@ impl KmipClient {
 
     /// Locate keys by name.
     pub fn locate(&mut self, name: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let request = build_locate_request(name);
+        let request = build_locate_request(name, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Locate response")?;
@@ -114,7 +142,7 @@ impl KmipClient {
 
     /// Get key material by unique ID.
     pub fn get(&mut self, unique_id: &str) -> Result<GetResult, Box<dyn std::error::Error>> {
-        let request = build_get_request(unique_id);
+        let request = build_get_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Get response")?;
@@ -130,7 +158,7 @@ impl KmipClient {
     ) -> Result<CreateResult, Box<dyn std::error::Error>> {
         let algo_enum = resolve_algorithm(algo.unwrap_or("AES"));
         let algo_enum = if algo_enum == 0 { algorithm::AES } else { algo_enum };
-        let request = build_create_request(name, algo_enum, length.unwrap_or(256));
+        let request = build_create_request(name, algo_enum, length.unwrap_or(256), self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Create response")?;
@@ -144,7 +172,7 @@ impl KmipClient {
         algo: u32,
         length: i32,
     ) -> Result<CreateKeyPairResult, Box<dyn std::error::Error>> {
-        let request = build_create_key_pair_request(name, algo, length);
+        let request = build_create_key_pair_request(name, algo, length, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in CreateKeyPair response")?;
@@ -160,7 +188,7 @@ impl KmipClient {
         algo: u32,
         length: i32,
     ) -> Result<CreateResult, Box<dyn std::error::Error>> {
-        let request = build_register_request(obj_type, material, name, algo, length);
+        let request = build_register_request(obj_type, material, name, algo, length, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Register response")?;
@@ -169,7 +197,7 @@ impl KmipClient {
 
     /// Re-key an existing key on the server.
     pub fn re_key(&mut self, unique_id: &str) -> Result<ReKeyResult, Box<dyn std::error::Error>> {
-        let request = build_re_key_request(unique_id);
+        let request = build_re_key_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in ReKey response")?;
@@ -184,7 +212,7 @@ impl KmipClient {
         name: &str,
         length: i32,
     ) -> Result<DeriveKeyResult, Box<dyn std::error::Error>> {
-        let request = build_derive_key_request(unique_id, derivation_data, name, length);
+        let request = build_derive_key_request(unique_id, derivation_data, name, length, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in DeriveKey response")?;
@@ -193,7 +221,7 @@ impl KmipClient {
 
     /// Check the status of a managed object.
     pub fn check(&mut self, unique_id: &str) -> Result<CheckResult, Box<dyn std::error::Error>> {
-        let request = build_check_request(unique_id);
+        let request = build_check_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Check response")?;
@@ -202,7 +230,7 @@ impl KmipClient {
 
     /// Get all attributes of a managed object.
     pub fn get_attributes(&mut self, unique_id: &str) -> Result<GetResult, Box<dyn std::error::Error>> {
-        let request = build_get_attributes_request(unique_id);
+        let request = build_get_attributes_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in GetAttributes response")?;
@@ -211,7 +239,7 @@ impl KmipClient {
 
     /// Get the list of attribute names for a managed object.
     pub fn get_attribute_list(&mut self, unique_id: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let request = build_get_attribute_list_request(unique_id);
+        let request = build_get_attribute_list_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         match response.payload {
@@ -225,7 +253,7 @@ impl KmipClient {
 
     /// Add an attribute to a managed object.
     pub fn add_attribute(&mut self, unique_id: &str, name: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_add_attribute_request(unique_id, name, value);
+        let request = build_add_attribute_request(unique_id, name, value, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -233,7 +261,7 @@ impl KmipClient {
 
     /// Modify an attribute of a managed object.
     pub fn modify_attribute(&mut self, unique_id: &str, name: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_modify_attribute_request(unique_id, name, value);
+        let request = build_modify_attribute_request(unique_id, name, value, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -241,7 +269,7 @@ impl KmipClient {
 
     /// Delete an attribute from a managed object.
     pub fn delete_attribute(&mut self, unique_id: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_delete_attribute_request(unique_id, name);
+        let request = build_delete_attribute_request(unique_id, name, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -249,7 +277,7 @@ impl KmipClient {
 
     /// Obtain a lease for a managed object. Returns lease time in seconds.
     pub fn obtain_lease(&mut self, unique_id: &str) -> Result<Option<u32>, Box<dyn std::error::Error>> {
-        let request = build_obtain_lease_request(unique_id);
+        let request = build_obtain_lease_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         match response.payload {
@@ -264,7 +292,7 @@ impl KmipClient {
 
     /// Activate a managed object.
     pub fn activate(&mut self, unique_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_activate_request(unique_id);
+        let request = build_activate_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -272,7 +300,7 @@ impl KmipClient {
 
     /// Revoke a managed object with the given reason code.
     pub fn revoke(&mut self, unique_id: &str, reason: u32) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_revoke_request(unique_id, reason);
+        let request = build_revoke_request(unique_id, reason, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -280,7 +308,7 @@ impl KmipClient {
 
     /// Destroy a managed object.
     pub fn destroy(&mut self, unique_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_destroy_request(unique_id);
+        let request = build_destroy_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -288,7 +316,7 @@ impl KmipClient {
 
     /// Archive a managed object.
     pub fn archive(&mut self, unique_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_archive_request(unique_id);
+        let request = build_archive_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -296,7 +324,7 @@ impl KmipClient {
 
     /// Recover an archived managed object.
     pub fn recover(&mut self, unique_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_recover_request(unique_id);
+        let request = build_recover_request(unique_id, self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -304,7 +332,7 @@ impl KmipClient {
 
     /// Query the server for supported operations and object types.
     pub fn query(&mut self) -> Result<QueryResult, Box<dyn std::error::Error>> {
-        let request = build_query_request();
+        let request = build_query_request(self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Query response")?;
@@ -313,7 +341,7 @@ impl KmipClient {
 
     /// Poll the server.
     pub fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let request = build_poll_request();
+        let request = build_poll_request(self.credential.as_ref());
         let response_data = self.send(&request)?;
         parse_response(&response_data)?;
         Ok(())
@@ -321,7 +349,7 @@ impl KmipClient {
 
     /// Discover KMIP versions supported by the server.
     pub fn discover_versions(&mut self) -> Result<DiscoverVersionsResult, Box<dyn std::error::Error>> {
-        let request = build_discover_versions_request();
+        let request = build_discover_versions_request(self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in DiscoverVersions response")?;
@@ -330,7 +358,7 @@ impl KmipClient {
 
     /// Encrypt data using a managed key.
     pub fn encrypt(&mut self, unique_id: &str, data: &[u8]) -> Result<EncryptResult, Box<dyn std::error::Error>> {
-        let request = build_encrypt_request(unique_id, data);
+        let request = build_encrypt_request(unique_id, data, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Encrypt response")?;
@@ -339,7 +367,7 @@ impl KmipClient {
 
     /// Decrypt data using a managed key.
     pub fn decrypt(&mut self, unique_id: &str, data: &[u8], nonce: Option<&[u8]>) -> Result<DecryptResult, Box<dyn std::error::Error>> {
-        let request = build_decrypt_request(unique_id, data, nonce);
+        let request = build_decrypt_request(unique_id, data, nonce, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Decrypt response")?;
@@ -348,7 +376,7 @@ impl KmipClient {
 
     /// Sign data using a managed key.
     pub fn sign(&mut self, unique_id: &str, data: &[u8]) -> Result<SignResult, Box<dyn std::error::Error>> {
-        let request = build_sign_request(unique_id, data);
+        let request = build_sign_request(unique_id, data, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in Sign response")?;
@@ -357,7 +385,7 @@ impl KmipClient {
 
     /// Verify a signature using a managed key.
     pub fn signature_verify(&mut self, unique_id: &str, data: &[u8], signature: &[u8]) -> Result<SignatureVerifyResult, Box<dyn std::error::Error>> {
-        let request = build_signature_verify_request(unique_id, data, signature);
+        let request = build_signature_verify_request(unique_id, data, signature, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in SignatureVerify response")?;
@@ -366,7 +394,7 @@ impl KmipClient {
 
     /// Compute a MAC using a managed key.
     pub fn mac(&mut self, unique_id: &str, data: &[u8]) -> Result<MacResult, Box<dyn std::error::Error>> {
-        let request = build_mac_request(unique_id, data);
+        let request = build_mac_request(unique_id, data, self.credential.as_ref());
         let response_data = self.send(&request)?;
         let response = parse_response(&response_data)?;
         let payload = response.payload.ok_or("No payload in MAC response")?;
@@ -378,7 +406,8 @@ impl KmipClient {
     // -----------------------------------------------------------------------
 
     /// Convenience: locate by name + get material in one call.
-    pub fn fetch_key(&mut self, name: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    /// Returns `Zeroizing<Vec<u8>>` — key material is automatically zeroed on drop.
+    pub fn fetch_key(&mut self, name: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, Box<dyn std::error::Error>> {
         let ids = self.locate(name)?;
         if ids.is_empty() {
             return Err(format!("KMIP: no key found with name \"{}\"", name).into());

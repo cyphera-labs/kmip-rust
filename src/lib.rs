@@ -41,6 +41,7 @@ pub mod ttlv;
 pub mod tags;
 pub mod operations;
 pub mod client;
+pub mod error;
 
 pub use client::{KmipClient, resolve_algorithm, zero_bytes};
 pub use operations::{
