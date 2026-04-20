@@ -2,6 +2,11 @@
 //!
 //! KMIP client for Rust -- connect to any KMIP-compliant key management server.
 //!
+//! # Thread Safety
+//!
+//! `KmipClient` is `Send` but not `Sync`. For concurrent use from multiple
+//! threads, wrap in `Arc<Mutex<KmipClient>>`.
+//!
 //! Supports all 27 KMIP 1.4 operations: Create, CreateKeyPair, Register,
 //! ReKey, DeriveKey, Locate, Check, Get, GetAttributes, GetAttributeList,
 //! AddAttribute, ModifyAttribute, DeleteAttribute, ObtainLease, Activate,

@@ -74,6 +74,9 @@ impl fmt::Display for TtlvError {
 
 impl std::error::Error for TtlvError {}
 
+/// Maximum TTLV item length (16 MB). Guards against overflow on 32-bit targets (fixes LOW-A1).
+const MAX_ITEM_LEN: usize = 16 * 1024 * 1024;
+
 /// Pad a length to 8-byte alignment.
 fn pad_to_8(len: usize) -> usize {
     (len + 7) & !7
@@ -171,6 +174,12 @@ fn decode_ttlv_depth(buf: &[u8], offset: usize, depth: usize) -> Result<TtlvItem
         buf[offset + 6],
         buf[offset + 7],
     ]) as usize;
+
+    // Guard against overflow on 32-bit targets (fixes LOW-A1)
+    if length > MAX_ITEM_LEN {
+        return Err(TtlvError::LengthExceedsBuffer(length, buf.len() - offset));
+    }
+
     let padded = pad_to_8(length);
     let total_length = 8 + padded;
     let value_start = offset + 8;

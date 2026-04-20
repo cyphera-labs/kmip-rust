@@ -27,11 +27,12 @@ pub struct LocateResult {
     pub unique_identifiers: Vec<String>,
 }
 
-/// Parsed Get response.
+/// Parsed Get response. Key material is wrapped in `Zeroizing` for automatic
+/// secure zeroing on drop (fixes MEDIUM-C2).
 pub struct GetResult {
     pub object_type: Option<u32>,
     pub unique_identifier: Option<String>,
-    pub key_material: Option<Vec<u8>>,
+    pub key_material: Option<zeroize::Zeroizing<Vec<u8>>>,
 }
 
 /// Parsed Create response.
@@ -651,7 +652,7 @@ pub fn parse_get_payload(payload: &TtlvItem) -> GetResult {
         .and_then(|sym| find_child(sym, tag::KEY_BLOCK))
         .and_then(|kb| find_child(kb, tag::KEY_VALUE))
         .and_then(|kv| find_child(kv, tag::KEY_MATERIAL))
-        .and_then(|km| km.value.as_bytes().map(|b| b.to_vec()));
+        .and_then(|km| km.value.as_bytes().map(|b| zeroize::Zeroizing::new(b.to_vec())));
 
     GetResult {
         object_type: obj_type,

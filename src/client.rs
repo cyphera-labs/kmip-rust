@@ -85,7 +85,8 @@ impl KmipClient {
             root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
         }
 
-        let config = ClientConfig::builder()
+        // Explicitly require TLS 1.3 minimum (fixes MEDIUM-B1)
+        let config = ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
             .with_root_certificates(root_store)
             .with_client_auth_cert(certs, key)?;
 
@@ -441,13 +442,18 @@ impl KmipClient {
     fn connect(
         &mut self,
     ) -> Result<&mut StreamOwned<ClientConnection, TcpStream>, Box<dyn std::error::Error>> {
-        if self.stream.is_some() {
-            return Ok(self.stream.as_mut().unwrap());
+        if let Some(ref mut s) = self.stream {
+            return Ok(s);
         }
 
+        // Use ToSocketAddrs to support both hostnames and IP addresses (fixes HIGH-D1)
+        use std::net::ToSocketAddrs;
         let addr = format!("{}:{}", self.host, self.port);
+        let socket_addr = addr.to_socket_addrs()?
+            .next()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "DNS resolution returned no addresses"))?;
         let tcp = TcpStream::connect_timeout(
-            &addr.parse()?,
+            &socket_addr,
             self.timeout,
         )?;
         tcp.set_read_timeout(Some(self.timeout))?;
@@ -461,7 +467,7 @@ impl KmipClient {
         let tls_stream = StreamOwned::new(conn, tcp);
 
         self.stream = Some(tls_stream);
-        Ok(self.stream.as_mut().unwrap())
+        Ok(self.stream.as_mut().expect("stream was just assigned"))
     }
 }
 
@@ -483,11 +489,10 @@ pub fn resolve_algorithm(name: &str) -> u32 {
     }
 }
 
-/// Securely zero a byte slice. Call this on key material when done.
+/// Securely zero a byte slice. Uses `zeroize` crate to prevent LLVM elision (fixes MEDIUM-C1).
 pub fn zero_bytes(b: &mut [u8]) {
-    for byte in b.iter_mut() {
-        *byte = 0;
-    }
+    use zeroize::Zeroize;
+    b.zeroize();
 }
 
 /// Load PEM certificates from bytes.
