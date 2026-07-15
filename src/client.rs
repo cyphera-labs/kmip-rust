@@ -122,11 +122,6 @@ impl KmipClient {
         });
     }
 
-    /// Get the current credential (used by operations module).
-    pub(crate) fn credential(&self) -> Option<&KmipCredential> {
-        self.credential.as_ref()
-    }
-
     // -----------------------------------------------------------------------
     // Core operations
     // -----------------------------------------------------------------------
@@ -480,7 +475,7 @@ impl KmipClient {
         let addr = format!("{}:{}", self.host, self.port);
         let socket_addr = addr.to_socket_addrs()?
             .next()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "DNS resolution returned no addresses"))?;
+            .ok_or_else(|| io::Error::other("DNS resolution returned no addresses"))?;
         let tcp = TcpStream::connect_timeout(
             &socket_addr,
             self.timeout,
